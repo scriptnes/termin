@@ -392,10 +392,38 @@
           },
           saveEdit() {
             if (this.editText[this.selectedLanguage].trim() !== "") {
-              this.terms[this.selectedYear][this.editMonthIndex][this.editIndex].text[this.selectedLanguage] =
-                this.editText[this.selectedLanguage].trim();
+              const editedText = this.editText[this.selectedLanguage].trim();
+              const targetLang = this.selectedLanguage === "bg" ? "de" : "bg";
+
+              // Активиране на лоудера
+              this.isLoading = true;
+
+              // Превод на текста
+              axios
+                .get(
+                  `https://api.mymemory.translated.net/get?q=${encodeURIComponent(editedText)}&langpair=${
+                    this.selectedLanguage
+                  }|${targetLang}`
+                )
+                .then((response) => {
+                  const translatedText = response.data.responseData.translatedText;
+
+                  // Актуализация на текста за двата езика
+                  this.terms[this.selectedYear][this.editMonthIndex][this.editIndex].text[this.selectedLanguage] =
+                    editedText;
+                  this.terms[this.selectedYear][this.editMonthIndex][this.editIndex].text[targetLang] = translatedText;
+                })
+                .catch((error) => {
+                  console.error("Грешка при превода:", error);
+                })
+                .finally(() => {
+                  // Деактивиране на лоудера
+                  this.isLoading = false;
+                  this.cancelEdit();
+                });
+            } else {
+              this.cancelEdit();
             }
-            this.cancelEdit();
           },
           cancelEdit() {
             this.editIndex = null;
