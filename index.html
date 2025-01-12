@@ -172,11 +172,39 @@
               class="d-flex justify-content-between align-items-center"
             >
               <div>
-                {{ term.day }} ({{ getDayOfWeek(selectedYear, monthIndex + 1, term.day) }}): {{
-                term.text[selectedLanguage] }}
+                <span v-if="!(editIndex === termIndex && editMonthIndex === monthIndex)">
+                  {{ term.day }} ({{ getDayOfWeek(selectedYear, monthIndex + 1, term.day) }}): {{
+                  term.text[selectedLanguage] }}
+                </span>
+                <input
+                  v-if="editIndex === termIndex && editMonthIndex === monthIndex"
+                  v-model="editText[selectedLanguage]"
+                  type="text"
+                  class="form-control d-inline-block"
+                  style="width: auto"
+                />
               </div>
+
               <div>
-                <button @click="startEditing(monthIndex, termIndex)" class="btn btn-sm btn-outline-secondary ms-2">
+                <button
+                  v-if="editIndex === termIndex && editMonthIndex === monthIndex"
+                  @click="saveEdit"
+                  class="btn btn-success btn-sm ms-2"
+                >
+                  Save
+                </button>
+                <button
+                  v-if="editIndex === termIndex && editMonthIndex === monthIndex"
+                  @click="cancelEdit"
+                  class="btn btn-secondary btn-sm ms-2"
+                >
+                  Cancel
+                </button>
+                <button
+                  v-else
+                  @click="startEditing(monthIndex, termIndex)"
+                  class="btn btn-sm btn-outline-secondary ms-2"
+                >
                   <i class="bi bi-pencil"></i>
                 </button>
                 <button @click="deleteTerm(monthIndex, termIndex)" class="btn btn-sm btn-outline-danger ms-2">
@@ -360,18 +388,19 @@
           startEditing(monthIndex, termIndex) {
             this.editIndex = termIndex;
             this.editMonthIndex = monthIndex;
-            this.editText = this.terms[this.selectedYear][monthIndex][termIndex].text[this.selectedLanguage];
+            this.editText = { ...this.terms[this.selectedYear][monthIndex][termIndex].text }; // Създаване на копие
           },
-          saveEdit(monthIndex, termIndex) {
-            if (this.editText.trim() !== "") {
-              this.terms[this.selectedYear][monthIndex][termIndex].text[this.selectedLanguage] = this.editText.trim();
+          saveEdit() {
+            if (this.editText[this.selectedLanguage].trim() !== "") {
+              this.terms[this.selectedYear][this.editMonthIndex][this.editIndex].text[this.selectedLanguage] =
+                this.editText[this.selectedLanguage].trim();
             }
             this.cancelEdit();
           },
           cancelEdit() {
             this.editIndex = null;
             this.editMonthIndex = null;
-            this.editText = "";
+            this.editText = {};
           },
           deleteTerm(monthIndex, termIndex) {
             const confirmMessage = this.translations[this.selectedLanguage].deleteConfirm; // Използвайте правилния превод
