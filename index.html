@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Календар с Vue.js</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
+    <link rel="icon" href="public/favicon.ico" type="image/x-icon" />
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+      .month-container {
+        display: grid;
+        grid-template-columns: repeat(12, 1fr);
+        gap: 10px;
+      }
+
+      .month-box {
+        width: 100%;
+        height: 120px;
+        border: 1px solid #ccc;
+        text-align: center;
+        cursor: pointer;
+        position: relative;
+      }
+
+      .month-box.selected {
+        background-color: lightblue;
+      }
+
+      .month-box .month-title {
+        font-size: 14px;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+
+      .month-box .term-count {
+        font-size: 12px;
+        color: #666;
+        position: absolute;
+        bottom: 5px;
+        width: 100%;
+      }
+
+      .term-entry {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 5px 0;
+      }
+
+      .term-entry div:first-child {
+        flex: 1;
+      }
+
+      .term-entry button {
+        margin-left: 5px;
+      }
+
+      .language-selector {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        gap: 10px; /* Разстояние между флаговете */
+        align-items: center; /* Центрира флаговете вертикално */
+      }
+
+      .language-selector img {
+        width: 30px;
+        height: 20px;
+        cursor: pointer;
+        border: 2px solid #ccc; /* Лека рамка за контраст */
+        border-radius: 5px; /* Заоблени ръбове */
+        background-color: #f8f9fa; /* Светъл сив фон */
+        transition: transform 0.2s ease, box-shadow 0.2s ease; /* Анимация при ховър */
+      }
+
+      .language-selector img:hover {
+        transform: scale(1.1); /* Увеличение при ховър */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); /* Сенки за ефект */
+      }
+
+      .spinner-border-sm {
+        width: 1rem;
+        height: 1rem;
+        margin-right: 5px;
+      }
+
+      @media (max-width: 1200px) {
+        .month-container {
+          grid-template-columns: repeat(6, 1fr);
+        }
+      }
+
+      @media (max-width: 768px) {
+        .month-container {
+          grid-template-columns: repeat(4, 1fr);
+        }
+      }
+
+      @media (max-width: 576px) {
+        .month-container {
+          grid-template-columns: repeat(2, 1fr);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app" class="container mt-5 position-relative">
+      <!-- Language selector -->
+      <div class="language-selector">
+        <img src="https://flagcdn.com/w40/bg.png" alt="Български" @click="setLanguage('bg')" />
+        <img src="https://flagcdn.com/w40/de.png" alt="Немски" @click="setLanguage('de')" />
+      </div>
+
+      <!-- Main content -->
+      <div class="mb-3">
+        <label for="year" class="form-label">{{ labels.year }}</label>
+        <select v-model="selectedYear" class="form-select" id="year">
+          <option v-for="year in years" :key="year" :value="year">{{ year }}</option>
+        </select>
+      </div>
+
+      <div v-if="selectedYear" class="mb-3">
+        <h5>{{ labels.monthsFor }} {{ selectedYear }}:</h5>
+        <div class="month-container">
+          <div
+            v-for="(month, index) in months[selectedLanguage]"
+            :key="index"
+            class="month-box"
+            :class="{ selected: selectedMonths.includes(index) }"
+            @click="toggleMonth(index)"
+          >
+            <div class="month-title">{{ month }}</div>
+            <div class="term-count">{{ labels.terms }}: {{ terms[selectedYear]?.[index]?.length || 0 }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="selectedMonths.length > 0" class="mt-4">
+        <h5>{{ labels.terms }}</h5>
+        <div v-for="monthIndex in selectedMonths" :key="monthIndex" class="mb-3">
+          <label :for="'month-' + monthIndex">{{ months[selectedLanguage][monthIndex] }}</label>
+          <div class="term-entry">
+            <input
+              v-model="newTerm[monthIndex]"
+              type="text"
+              class="form-control"
+              :id="'month-' + monthIndex"
+              :placeholder="labels.addTerm"
+            />
+            <select v-model="selectedDay[monthIndex]" class="form-select">
+              <option v-for="day in daysInMonth(monthIndex + 1, selectedYear)" :key="day" :value="day">
+                {{ day }} - {{ getDayOfWeek(selectedYear, monthIndex + 1, day) }}
+              </option>
+            </select>
+            <button @click="addTerm(monthIndex)" class="btn btn-primary" :disabled="isLoading">
+              <span v-if="isLoading">
+                <div class="spinner-border spinner-border-sm" role="status">
+                  <span class="visually-hidden">Loading...</span>
+                </div>
+              </span>
+              <span v-else>{{ labels.add }}</span>
+            </button>
+          </div>
+          <ul class="mt-2">
+            <li
+              v-for="(term, termIndex) in terms[selectedYear]?.[monthIndex] || []"
+              :key="term.day + term.text.bg"
+              class="d-flex justify-content-between align-items-center"
+            >
+              <div>
+                {{ term.day }} ({{ getDayOfWeek(selectedYear, monthIndex + 1, term.day) }}): {{
+                term.text[selectedLanguage] }}
+              </div>
+              <div>
+                <button @click="startEditing(monthIndex, termIndex)" class="btn btn-sm btn-outline-secondary ms-2">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button @click="deleteTerm(monthIndex, termIndex)" class="btn btn-sm btn-outline-danger ms-2">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      new Vue({
+        el: "#app",
+        data: {
+          currentYear: new Date().getFullYear(),
+          selectedYear: null,
+          selectedLanguage: "bg",
+          labels: {
+            year: "Избери година:",
+            monthsFor: "Месеци за",
+            terms: "Термини",
+            addTerm: "Добави термин",
+            add: "Добави",
+          },
+          translations: {
+            bg: {
+              year: "Избери година:",
+              monthsFor: "Месеци за",
+              terms: "Термини",
+              addTerm: "Добави термин",
+              add: "Добави",
+              deleteConfirm: "Сигурни ли сте, че искате да изтриете този термин?", // Добавено съобщение
+            },
+            de: {
+              year: "Wähle ein Jahr:",
+              monthsFor: "Monate für",
+              terms: "Termine",
+              addTerm: "Termin hinzufügen",
+              add: "Hinzufügen",
+              deleteConfirm: "Sind Sie sicher, dass Sie diesen Termin löschen möchten?", // Добавено съобщение
+            },
+          },
+          months: {
+            bg: [
+              "Януари",
+              "Февруари",
+              "Март",
+              "Април",
+              "Май",
+              "Юни",
+              "Юли",
+              "Август",
+              "Септември",
+              "Октомври",
+              "Ноември",
+              "Декември",
+            ],
+            de: [
+              "Januar",
+              "Februar",
+              "März",
+              "April",
+              "Mai",
+              "Juni",
+              "Juli",
+              "August",
+              "September",
+              "Oktober",
+              "November",
+              "Dezember",
+            ],
+          },
+          selectedMonths: [],
+          terms: {},
+          newTerm: {},
+          selectedDay: {},
+          editIndex: null,
+          editMonthIndex: null,
+          editText: "",
+          isLoading: false, // Ново свойство
+        },
+        computed: {
+          years() {
+            return [this.currentYear - 1, this.currentYear, this.currentYear + 1];
+          },
+        },
+        mounted() {
+          this.selectedYear = this.currentYear;
+          this.loadFromLocalStorage();
+          this.selectedMonths.forEach((index) => {
+            if (!this.selectedDay[index]) {
+              this.$set(this.selectedDay, index, 1);
+            }
+          });
+        },
+        methods: {
+          setLanguage(lang) {
+            this.selectedLanguage = lang; // Промяна на текущия език
+            this.labels = this.translations[lang]; // Обновяване на етикетите
+            this.updateDayNames(); // Обновяване на дните от седмицата, ако е необходимо
+          },
+          updateDayNames() {
+            this.daysOfWeek =
+              this.selectedLanguage === "bg"
+                ? ["Неделя", "Понеделник", "Вторник", "Сряда", "Четвъртък", "Петък", "Събота"]
+                : ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+          },
+          daysInMonth(month, year) {
+            return new Date(year, month, 0).getDate();
+          },
+          toggleMonth(index) {
+            if (!this.terms[this.selectedYear]) {
+              this.$set(this.terms, this.selectedYear, {});
+            }
+
+            if (this.selectedMonths.includes(index)) {
+              this.selectedMonths.splice(this.selectedMonths.indexOf(index), 1);
+              this.$delete(this.terms[this.selectedYear], index);
+              this.$delete(this.selectedDay, index); // Премахваме избрания ден
+            } else {
+              this.selectedMonths.push(index);
+              if (!this.terms[this.selectedYear][index]) {
+                this.$set(this.terms[this.selectedYear], index, []);
+              }
+              // Задаваме първия ден като дефолтен, ако не е зададен
+              if (!this.selectedDay[index]) {
+                this.$set(this.selectedDay, index, 1);
+              }
+            }
+          },
+          async addTerm(monthIndex) {
+            if (!this.terms[this.selectedYear]) {
+              this.$set(this.terms, this.selectedYear, {});
+            }
+
+            if (!this.terms[this.selectedYear][monthIndex]) {
+              this.$set(this.terms[this.selectedYear], monthIndex, []);
+            }
+
+            if (this.newTerm[monthIndex] && this.selectedDay[monthIndex]) {
+              const termText = this.newTerm[monthIndex];
+              let translatedText = "";
+
+              const langPair = this.selectedLanguage === "bg" ? "bg|de" : "de|bg";
+
+              this.isLoading = true; // Активиране на лоудера
+
+              try {
+                const response = await axios.get(
+                  `https://api.mymemory.translated.net/get?q=${encodeURIComponent(termText)}&langpair=${langPair}`
+                );
+                translatedText = response.data.responseData.translatedText;
+              } catch (error) {
+                console.error("Грешка при превода:", error);
+              } finally {
+                this.isLoading = false; // Деактивиране на лоудера
+              }
+
+              const textObject =
+                this.selectedLanguage === "bg"
+                  ? { bg: termText, de: translatedText }
+                  : { bg: translatedText, de: termText };
+
+              this.terms[this.selectedYear][monthIndex].push({
+                day: this.selectedDay[monthIndex],
+                text: textObject,
+              });
+
+              this.newTerm[monthIndex] = ""; // Изчистване на полето за нов термин
+            }
+          },
+          getDayOfWeek(year, month, day) {
+            const days =
+              this.selectedLanguage === "bg"
+                ? ["Неделя", "Понеделник", "Вторник", "Сряда", "Четвъртък", "Петък", "Събота"]
+                : ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+            return days[new Date(year, month - 1, day).getDay()];
+          },
+          startEditing(monthIndex, termIndex) {
+            this.editIndex = termIndex;
+            this.editMonthIndex = monthIndex;
+            this.editText = this.terms[this.selectedYear][monthIndex][termIndex].text[this.selectedLanguage];
+          },
+          saveEdit(monthIndex, termIndex) {
+            if (this.editText.trim() !== "") {
+              this.terms[this.selectedYear][monthIndex][termIndex].text[this.selectedLanguage] = this.editText.trim();
+            }
+            this.cancelEdit();
+          },
+          cancelEdit() {
+            this.editIndex = null;
+            this.editMonthIndex = null;
+            this.editText = "";
+          },
+          deleteTerm(monthIndex, termIndex) {
+            const confirmMessage = this.translations[this.selectedLanguage].deleteConfirm; // Използвайте правилния превод
+            if (confirm(confirmMessage)) {
+              this.terms[this.selectedYear][monthIndex].splice(termIndex, 1);
+            }
+          },
+          saveToLocalStorage() {
+            localStorage.setItem("calendarData", JSON.stringify(this.terms));
+          },
+          loadFromLocalStorage() {
+            const storedData = localStorage.getItem("calendarData");
+            if (storedData) {
+              this.terms = JSON.parse(storedData);
+            }
+            if (this.terms[this.selectedYear]) {
+              this.selectedMonths = Object.keys(this.terms[this.selectedYear]).map(Number);
+            }
+          },
+        },
+        watch: {
+          selectedYear(newYear) {
+            if (this.terms[newYear]) {
+              this.selectedMonths = Object.keys(this.terms[newYear]).map(Number);
+            } else {
+              this.selectedMonths = [];
+            }
+          },
+          terms: {
+            handler() {
+              this.saveToLocalStorage();
+            },
+            deep: true,
+          },
+        },
+      });
+    </script>
+  </body>
+</html>
