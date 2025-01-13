@@ -333,10 +333,18 @@
           this.selectedYear = this.currentYear;
           this.loadFromLocalStorage();
 
+          // Зареждане на селектираните месеци от localStorage
+          const storedSelectedMonths = localStorage.getItem(`selectedMonths_${this.selectedYear}`);
+          if (storedSelectedMonths) {
+            this.selectedMonths = JSON.parse(storedSelectedMonths);
+          } else {
+            this.selectedMonths = [];
+          }
+
+          // Инициализация на selectedDay за всеки избран месец
           this.selectedMonths.forEach((index) => {
-            // Ако няма стойност за избрания ден, задава празна стойност
             if (!this.selectedDay[index]) {
-              this.$set(this.selectedDay, index, ""); // Празна стойност за деня
+              this.$set(this.selectedDay, index, "");
             }
           });
         },
@@ -365,15 +373,22 @@
               if (!this.terms[this.selectedYear][index]) {
                 this.$set(this.terms[this.selectedYear], index, []);
               }
-              if (!this.selectedDay[index]) {
-                this.$set(this.selectedDay, index, 1);
-              }
+              // Задава празна стойност за избрания ден при селекция на месец
+              this.$set(this.selectedDay, index, "");
             } else {
               this.selectedMonths = this.selectedMonths.filter((month) => month !== index);
+              // Задава празна стойност за избрания ден при деселекция на месец
+              this.$set(this.selectedDay, index, "");
             }
 
             this.selectedMonths.sort((a, b) => a - b);
+            // Запазване на селектираните месеци в localStorage
+            this.saveSelectedMonths();
           },
+          saveSelectedMonths() {
+            localStorage.setItem(`selectedMonths_${this.selectedYear}`, JSON.stringify(this.selectedMonths));
+          },
+
           async addTerm(monthIndex) {
             if (!this.terms[this.selectedYear]) {
               this.$set(this.terms, this.selectedYear, {});
@@ -479,7 +494,6 @@
             const storedData = localStorage.getItem("calendarData");
             if (storedData) {
               this.terms = JSON.parse(storedData);
-
               Object.keys(this.terms).forEach((year) => {
                 Object.keys(this.terms[year]).forEach((month) => {
                   this.terms[year][month].sort((a, b) => a.day - b.day);
@@ -487,15 +501,18 @@
               });
             }
 
-            if (this.terms[this.selectedYear]) {
-              this.selectedMonths = Object.keys(this.terms[this.selectedYear]).map(Number);
-            }
+            // Зареждане на избраните месеци за текущата година
+            this.selectedMonths = localStorage.getItem(`selectedMonths_${this.selectedYear}`)
+              ? JSON.parse(localStorage.getItem(`selectedMonths_${this.selectedYear}`))
+              : [];
           },
         },
         watch: {
           selectedYear(newYear) {
-            if (this.terms[newYear]) {
-              this.selectedMonths = Object.keys(this.terms[newYear]).map(Number);
+            this.saveSelectedMonths(); // Запазваме текущите избрани месеци
+            const storedSelectedMonths = localStorage.getItem(`selectedMonths_${newYear}`);
+            if (storedSelectedMonths) {
+              this.selectedMonths = JSON.parse(storedSelectedMonths);
             } else {
               this.selectedMonths = [];
             }
