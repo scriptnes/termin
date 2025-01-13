@@ -23,10 +23,16 @@
         text-align: center;
         cursor: pointer;
         position: relative;
+        transition: transform 0.2s ease;
+      }
+
+      .month-box:hover {
+        transform: scale(1.05);
       }
 
       .month-box.selected {
-        background-color: lightblue;
+        border: 3px solid #000;
+        filter: brightness(90%);
       }
 
       .month-box .month-title {
@@ -41,6 +47,14 @@
         position: absolute;
         bottom: 5px;
         width: 100%;
+      }
+
+      .month-label {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-weight: normal;
+        color: #000; /* Черен текст за контраст */
       }
 
       .term-entry {
@@ -131,6 +145,7 @@
             :key="index"
             class="month-box"
             :class="{ selected: selectedMonths.includes(index) }"
+            :style="{ backgroundColor: colors[index] }"
             @click="toggleMonth(index)"
           >
             <div class="month-title">{{ month }}</div>
@@ -142,7 +157,9 @@
       <div v-if="selectedMonths.length > 0" class="mt-4">
         <h5>{{ labels.terms }}</h5>
         <div v-for="monthIndex in selectedMonths" :key="monthIndex" class="mb-3">
-          <label :for="'month-' + monthIndex">{{ months[selectedLanguage][monthIndex] }}</label>
+          <label :for="'month-' + monthIndex" class="month-label" :style="{ backgroundColor: colors[monthIndex] }">
+            {{ months[selectedLanguage][monthIndex] }}
+          </label>
           <div class="term-entry">
             <input
               v-model="newTerm[monthIndex]"
@@ -238,7 +255,7 @@
               terms: "Термини",
               addTerm: "Добави термин",
               add: "Добави",
-              deleteConfirm: "Сигурни ли сте, че искате да изтриете този термин?", // Добавено съобщение
+              deleteConfirm: "Сигурни ли сте, че искате да изтриете този термин?",
             },
             de: {
               year: "Wähle ein Jahr:",
@@ -246,7 +263,7 @@
               terms: "Termine",
               addTerm: "Termin hinzufügen",
               add: "Hinzufügen",
-              deleteConfirm: "Sind Sie sicher, dass Sie diesen Termin löschen möchten?", // Добавено съобщение
+              deleteConfirm: "Sind Sie sicher, dass Sie diesen Termin löschen möchten?",
             },
           },
           months: {
@@ -279,6 +296,20 @@
               "Dezember",
             ],
           },
+          colors: [
+            "#FFCCCC",
+            "#FFE6CC",
+            "#FFFFCC",
+            "#E6FFCC",
+            "#CCFFCC",
+            "#CCFFE6",
+            "#CCFFFF",
+            "#CCE5FF",
+            "#CCCCFF",
+            "#E6CCFF",
+            "#FFCCFF",
+            "#FFCCE5",
+          ],
           selectedMonths: [],
           terms: {},
           newTerm: {},
@@ -286,7 +317,7 @@
           editIndex: null,
           editMonthIndex: null,
           editText: "",
-          isLoading: false, // Ново свойство
+          isLoading: false,
         },
         computed: {
           years() {
@@ -304,9 +335,9 @@
         },
         methods: {
           setLanguage(lang) {
-            this.selectedLanguage = lang; // Промяна на текущия език
-            this.labels = this.translations[lang]; // Обновяване на етикетите
-            this.updateDayNames(); // Обновяване на дните от седмицата, ако е необходимо
+            this.selectedLanguage = lang;
+            this.labels = this.translations[lang];
+            this.updateDayNames();
           },
           updateDayNames() {
             this.daysOfWeek =
@@ -323,20 +354,17 @@
             }
 
             if (!this.selectedMonths.includes(index)) {
-              // Добавяне на месеца, ако не е селектиран
               this.selectedMonths.push(index);
               if (!this.terms[this.selectedYear][index]) {
-                this.$set(this.terms[this.selectedYear], index, []); // Инициализиране на празен масив, ако липсва
+                this.$set(this.terms[this.selectedYear], index, []);
               }
               if (!this.selectedDay[index]) {
-                this.$set(this.selectedDay, index, 1); // Задаване на дефолтен ден
+                this.$set(this.selectedDay, index, 1);
               }
             } else {
-              // Премахване на месеца от визуализацията, но оставяне на термините
               this.selectedMonths = this.selectedMonths.filter((month) => month !== index);
             }
 
-            // Сортиране на избраните месеци по ред
             this.selectedMonths.sort((a, b) => a - b);
           },
           async addTerm(monthIndex) {
@@ -372,15 +400,13 @@
                   ? { bg: termText, de: translatedText }
                   : { bg: translatedText, de: termText };
 
-              // Добавяне на нов термин
               this.terms[this.selectedYear][monthIndex].push({
-                day: parseInt(this.selectedDay[monthIndex], 10), // Уверяваме се, че стойността е число
+                day: parseInt(this.selectedDay[monthIndex], 10),
                 text: textObject,
               });
 
-              // Сортиране на термините по числова стойност на 'day'
               this.terms[this.selectedYear][monthIndex].sort((a, b) => a.day - b.day);
-              this.newTerm[monthIndex] = ""; // Изчистване на полето за нов термин
+              this.newTerm[monthIndex] = "";
             }
           },
           getDayOfWeek(year, month, day) {
@@ -393,17 +419,15 @@
           startEditing(monthIndex, termIndex) {
             this.editIndex = termIndex;
             this.editMonthIndex = monthIndex;
-            this.editText = { ...this.terms[this.selectedYear][monthIndex][termIndex].text }; // Създаване на копие
+            this.editText = { ...this.terms[this.selectedYear][monthIndex][termIndex].text };
           },
           saveEdit() {
             if (this.editText[this.selectedLanguage].trim() !== "") {
               const editedText = this.editText[this.selectedLanguage].trim();
               const targetLang = this.selectedLanguage === "bg" ? "de" : "bg";
 
-              // Активиране на лоудера
               this.isLoading = true;
 
-              // Превод на текста
               axios
                 .get(
                   `https://api.mymemory.translated.net/get?q=${encodeURIComponent(editedText)}&langpair=${
@@ -413,7 +437,6 @@
                 .then((response) => {
                   const translatedText = response.data.responseData.translatedText;
 
-                  // Актуализация на текста за двата езика
                   this.terms[this.selectedYear][this.editMonthIndex][this.editIndex].text[this.selectedLanguage] =
                     editedText;
                   this.terms[this.selectedYear][this.editMonthIndex][this.editIndex].text[targetLang] = translatedText;
@@ -422,7 +445,6 @@
                   console.error("Грешка при превода:", error);
                 })
                 .finally(() => {
-                  // Деактивиране на лоудера
                   this.isLoading = false;
                   this.cancelEdit();
                 });
@@ -436,7 +458,7 @@
             this.editText = {};
           },
           deleteTerm(monthIndex, termIndex) {
-            const confirmMessage = this.translations[this.selectedLanguage].deleteConfirm; // Използвайте правилния превод
+            const confirmMessage = this.translations[this.selectedLanguage].deleteConfirm;
             if (confirm(confirmMessage)) {
               this.terms[this.selectedYear][monthIndex].splice(termIndex, 1);
             }
@@ -449,7 +471,6 @@
             if (storedData) {
               this.terms = JSON.parse(storedData);
 
-              // Сортиране на термините за всеки месец
               Object.keys(this.terms).forEach((year) => {
                 Object.keys(this.terms[year]).forEach((month) => {
                   this.terms[year][month].sort((a, b) => a.day - b.day);
