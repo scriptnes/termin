@@ -322,21 +322,18 @@
               this.$set(this.terms, this.selectedYear, {});
             }
 
-            if (this.selectedMonths.includes(index)) {
-              // Премахване на месеца, ако вече е селектиран
-              this.selectedMonths.splice(this.selectedMonths.indexOf(index), 1);
-              this.$delete(this.terms[this.selectedYear], index);
-              this.$delete(this.selectedDay, index);
-            } else {
-              // Добавяне на нов месец
+            if (!this.selectedMonths.includes(index)) {
+              // Добавяне на месеца, ако не е селектиран
               this.selectedMonths.push(index);
               if (!this.terms[this.selectedYear][index]) {
-                this.$set(this.terms[this.selectedYear], index, []);
+                this.$set(this.terms[this.selectedYear], index, []); // Инициализиране на празен масив, ако липсва
               }
-              // Задаване на дефолтния ден
               if (!this.selectedDay[index]) {
-                this.$set(this.selectedDay, index, 1);
+                this.$set(this.selectedDay, index, 1); // Задаване на дефолтен ден
               }
+            } else {
+              // Премахване на месеца от визуализацията, но оставяне на термините
+              this.selectedMonths = this.selectedMonths.filter((month) => month !== index);
             }
 
             // Сортиране на избраните месеци по ред
