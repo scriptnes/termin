@@ -357,7 +357,7 @@
 
               const langPair = this.selectedLanguage === "bg" ? "bg|de" : "de|bg";
 
-              this.isLoading = true; // Активиране на лоудера
+              this.isLoading = true;
 
               try {
                 const response = await axios.get(
@@ -367,7 +367,7 @@
               } catch (error) {
                 console.error("Грешка при превода:", error);
               } finally {
-                this.isLoading = false; // Деактивиране на лоудера
+                this.isLoading = false;
               }
 
               const textObject =
@@ -375,11 +375,14 @@
                   ? { bg: termText, de: translatedText }
                   : { bg: translatedText, de: termText };
 
+              // Добавяне на нов термин
               this.terms[this.selectedYear][monthIndex].push({
-                day: this.selectedDay[monthIndex],
+                day: parseInt(this.selectedDay[monthIndex], 10), // Уверяваме се, че стойността е число
                 text: textObject,
               });
 
+              // Сортиране на термините по числова стойност на 'day'
+              this.terms[this.selectedYear][monthIndex].sort((a, b) => a.day - b.day);
               this.newTerm[monthIndex] = ""; // Изчистване на полето за нов термин
             }
           },
@@ -448,7 +451,15 @@
             const storedData = localStorage.getItem("calendarData");
             if (storedData) {
               this.terms = JSON.parse(storedData);
+
+              // Сортиране на термините за всеки месец
+              Object.keys(this.terms).forEach((year) => {
+                Object.keys(this.terms[year]).forEach((month) => {
+                  this.terms[year][month].sort((a, b) => a.day - b.day);
+                });
+              });
             }
+
             if (this.terms[this.selectedYear]) {
               this.selectedMonths = Object.keys(this.terms[this.selectedYear]).map(Number);
             }
