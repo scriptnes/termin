@@ -169,10 +169,12 @@
               :placeholder="labels.addTerm"
             />
             <select v-model="selectedDay[monthIndex]" class="form-select">
+              <option value="" disabled>{{ labels.addDay }}</option>
               <option v-for="day in daysInMonth(monthIndex + 1, selectedYear)" :key="day" :value="day">
                 {{ day }} - {{ getDayOfWeek(selectedYear, monthIndex + 1, day) }}
               </option>
             </select>
+
             <button @click="addTerm(monthIndex)" class="btn btn-primary" :disabled="isLoading">
               <span v-if="isLoading">
                 <div class="spinner-border spinner-border-sm" role="status">
@@ -247,6 +249,7 @@
             terms: "Термини",
             addTerm: "Добави термин",
             add: "Добави",
+            addDay: "Добави дата", // Динамично съобщение за добавяне на ден
           },
           translations: {
             bg: {
@@ -255,6 +258,7 @@
               terms: "Термини",
               addTerm: "Добави термин",
               add: "Добави",
+              addDay: "Добави дата", // Превод на български
               deleteConfirm: "Сигурни ли сте, че искате да изтриете този термин?",
             },
             de: {
@@ -263,6 +267,7 @@
               terms: "Termine",
               addTerm: "Termin hinzufügen",
               add: "Hinzufügen",
+              addDay: "Datum hinzufügen", // Превод на немски
               deleteConfirm: "Sind Sie sicher, dass Sie diesen Termin löschen möchten?",
             },
           },
@@ -327,9 +332,11 @@
         mounted() {
           this.selectedYear = this.currentYear;
           this.loadFromLocalStorage();
+
           this.selectedMonths.forEach((index) => {
+            // Ако няма стойност за избрания ден, задава празна стойност
             if (!this.selectedDay[index]) {
-              this.$set(this.selectedDay, index, 1);
+              this.$set(this.selectedDay, index, ""); // Празна стойност за деня
             }
           });
         },
@@ -406,7 +413,9 @@
               });
 
               this.terms[this.selectedYear][monthIndex].sort((a, b) => a.day - b.day);
+              // Ресет на текстовото поле и падащото меню
               this.newTerm[monthIndex] = "";
+              this.$set(this.selectedDay, monthIndex, ""); // Ресет на избрания ден
             }
           },
           getDayOfWeek(year, month, day) {
