@@ -323,19 +323,24 @@
             }
 
             if (this.selectedMonths.includes(index)) {
+              // Премахване на месеца, ако вече е селектиран
               this.selectedMonths.splice(this.selectedMonths.indexOf(index), 1);
               this.$delete(this.terms[this.selectedYear], index);
-              this.$delete(this.selectedDay, index); // Премахваме избрания ден
+              this.$delete(this.selectedDay, index);
             } else {
+              // Добавяне на нов месец
               this.selectedMonths.push(index);
               if (!this.terms[this.selectedYear][index]) {
                 this.$set(this.terms[this.selectedYear], index, []);
               }
-              // Задаваме първия ден като дефолтен, ако не е зададен
+              // Задаване на дефолтния ден
               if (!this.selectedDay[index]) {
                 this.$set(this.selectedDay, index, 1);
               }
             }
+
+            // Сортиране на избраните месеци по ред
+            this.selectedMonths.sort((a, b) => a - b);
           },
           async addTerm(monthIndex) {
             if (!this.terms[this.selectedYear]) {
