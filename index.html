@@ -176,6 +176,27 @@
           gap: 5px;
           justify-content: flex-end;
         }
+
+        /* Стандартно показваме и текст */
+        .btn-responsive i {
+          margin-right: 5px;
+        }
+
+        /* Под 576px — показваме само икона */
+        @media (max-width: 576px) {
+          .btn-responsive {
+            padding: 6px 10px;
+            font-size: 1.1rem;
+          }
+
+          .btn-responsive span {
+            display: none;
+          }
+
+          .btn-responsive i {
+            margin-right: 0; /* махаме разстоянието */
+          }
+        }
       }
     </style>
   </head>
@@ -196,16 +217,20 @@
       </div>
 
       <div class="mb-3 d-flex justify-content-end gap-2 flex-wrap">
-        <button class="btn btn-outline-dark" @click="downloadJSON">
-          <i class="bi bi-download"></i> {{ labels.saveFile || 'Запази файл' }}
+        <button class="btn btn-outline-dark btn-responsive" @click="downloadJSON">
+          <i class="bi bi-download"></i> <span>{{ labels.saveFile || 'Запази файл' }}</span>
         </button>
-        <button class="btn btn-outline-primary" @click="triggerFileInput">
-          <i class="bi bi-upload"></i> {{ labels.loadFile || 'Зареди файл' }}
+
+        <button class="btn btn-outline-primary btn-responsive" @click="triggerFileInput">
+          <i class="bi bi-upload"></i> <span>{{ labels.loadFile || 'Зареди файл' }}</span>
         </button>
+
         <input type="file" id="fileInput" ref="fileInput" accept=".json" @change="loadFromFile" style="display: none" />
-        <button class="btn btn-outline-warning" @click="restoreFromBackup">
-          <i class="bi bi-arrow-counterclockwise"></i> {{ labels.restoreFile }}
+
+        <button class="btn btn-outline-warning btn-responsive" @click="restoreFromBackup">
+          <i class="bi bi-arrow-counterclockwise"></i> <span>{{ labels.restoreFile }}</span>
         </button>
+
         <button
           id="downloadSnapshotBtn"
           @click="takeScreenshot"
