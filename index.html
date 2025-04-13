@@ -9,6 +9,8 @@
     <link rel="icon" href="public/favicon.ico" type="image/x-icon" />
     <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
     <style>
       .month-container {
         display: grid;
@@ -119,6 +121,17 @@
           grid-template-columns: repeat(2, 1fr);
         }
       }
+      .screenshot-mode {
+        background-color: #198754 !important; /* Зелен фон */
+        color: white !important; /* Бяла икона */
+        border-color: #198754 !important;
+      }
+      #downloadSnapshotBtn:hover,
+      #downloadSnapshotBtn:focus {
+        background-color: #198754;
+        border-color: #198754;
+        color: white;
+      }
     </style>
   </head>
   <body>
@@ -147,6 +160,15 @@
         <input type="file" id="fileInput" ref="fileInput" accept=".json" @change="loadFromFile" style="display: none" />
         <button class="btn btn-outline-warning" @click="restoreFromBackup">
           <i class="bi bi-arrow-counterclockwise"></i> {{ labels.restoreFile }}
+        </button>
+        <button
+          id="downloadSnapshotBtn"
+          @click="takeScreenshot"
+          class="btn btn-outline-success rounded d-flex align-items-center justify-content-center"
+          style="width: 44px; height: 44px"
+          :title="labels.takeScreenshot"
+        >
+          <i class="bi bi-camera" style="font-size: 1.2rem"></i>
         </button>
       </div>
 
@@ -268,6 +290,7 @@
             addTerm: "Добави термин",
             add: "Добави",
             addDay: "Добави дата", // Динамично съобщение за добавяне на ден
+            screenshot: "Заснеми календар",
           },
           translations: {
             bg: {
@@ -278,6 +301,7 @@
               add: "Добави",
               addDay: "Добави дата", // Превод на български
               deleteConfirm: "Сигурни ли сте, че искате да изтриете този термин?",
+              screenshot: "Заснеми календар",
             },
             de: {
               year: "Wähle ein Jahr:",
@@ -287,6 +311,7 @@
               add: "Hinzufügen",
               addDay: "Datum hinzufügen", // Превод на немски
               deleteConfirm: "Sind Sie sicher, dass Sie diesen Termin löschen möchten?",
+              screenshot: "Screenshot erstellen",
             },
           },
           months: {
@@ -370,6 +395,7 @@
               restoreFile: "Възстанови архив",
               noBackup: "Няма наличен архив.",
               yearFallback: "Няма данни за {year}, зареждам {fallbackYear}.",
+              noDataToSave: "Няма данни за запазване.",
             },
             de: {
               year: "Wähle ein Jahr:",
@@ -388,6 +414,7 @@
               restoreFile: "Backup wiederherstellen",
               noBackup: "Keine Sicherung verfügbar.",
               yearFallback: "Keine Daten für {year}, lade {fallbackYear}.",
+              noDataToSave: "Keine Daten zum Speichern vorhanden.", // 🔁 ново за de
             },
           },
           alertMessage: "",
@@ -577,23 +604,76 @@
             localStorage.setItem("calendarData", JSON.stringify(this.terms));
           },
           loadFromLocalStorage() {
-            const storedData = localStorage.getItem("calendarData");
-            if (storedData) {
-              this.terms = JSON.parse(storedData);
-              Object.keys(this.terms).forEach((year) => {
-                Object.keys(this.terms[year]).forEach((month) => {
-                  this.terms[year][month].sort((a, b) => a.day - b.day);
-                });
-              });
-            }
+            const backup = localStorage.getItem("calendar_backup");
 
-            // Зареждане на избраните месеци за текущата година
-            this.selectedMonths = localStorage.getItem(`selectedMonths_${this.selectedYear}`)
-              ? JSON.parse(localStorage.getItem(`selectedMonths_${this.selectedYear}`))
-              : [];
+            if (backup) {
+              try {
+                const parsed = JSON.parse(backup);
+
+                if (parsed.terms && parsed.config) {
+                  this.terms = parsed.terms;
+                  this.selectedYear = parsed.config.selectedYear;
+                  this.selectedLanguage = parsed.config.selectedLanguage || "bg";
+                  this.selectedMonths = parsed.config.selectedMonths || [];
+                  this.rememberSelection = parsed.config.rememberSelection ?? true;
+                } else {
+                  this.terms = parsed;
+                  this.selectedYear = this.currentYear;
+                  this.selectedLanguage = "bg";
+                  this.selectedMonths = [];
+                }
+
+                Object.keys(this.terms).forEach((year) => {
+                  Object.keys(this.terms[year]).forEach((month) => {
+                    const monthData = this.terms[year][month];
+                    if (!Array.isArray(monthData)) {
+                      this.terms[year][month] = [];
+                    } else {
+                      this.terms[year][month].sort((a, b) => a.day - b.day);
+                    }
+                  });
+                });
+
+                this.selectedMonths.forEach((index) => {
+                  if (!this.selectedDay[index]) {
+                    this.$set(this.selectedDay, index, "");
+                  }
+                });
+              } catch (e) {
+                console.error("Грешка при зареждане на backup:", e);
+              }
+            } else {
+              const storedData = localStorage.getItem("calendarData");
+              if (storedData) {
+                this.terms = JSON.parse(storedData);
+                this.selectedYear = this.currentYear;
+                this.selectedLanguage = "bg";
+                this.selectedMonths = Object.keys(this.terms[this.selectedYear] || {}).map(Number);
+              } else {
+                this.terms = {};
+                this.selectedYear = this.currentYear;
+                this.selectedLanguage = "bg";
+                this.selectedMonths = [];
+              }
+            }
           },
           downloadJSON() {
-            const dataStr = JSON.stringify(this.terms, null, 2);
+            if (!this.terms || Object.keys(this.terms).length === 0) {
+              this.showAlert(this.translations[this.selectedLanguage].noDataToSave, "warning");
+              return;
+            }
+
+            const fullData = {
+              terms: this.terms,
+              config: {
+                selectedYear: this.selectedYear,
+                selectedLanguage: this.selectedLanguage,
+                selectedMonths: this.selectedMonths,
+                rememberSelection: true,
+              },
+            };
+
+            const dataStr = JSON.stringify(fullData, null, 2);
             const blob = new Blob([dataStr], { type: "application/json" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -605,9 +685,10 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            localStorage.setItem("calendar_backup", JSON.stringify(this.terms));
-          },
 
+            // архивиране
+            localStorage.setItem("calendar_backup", JSON.stringify(fullData));
+          },
           triggerFileInput() {
             this.$refs.fileInput.click();
           },
@@ -621,41 +702,40 @@
               try {
                 const json = JSON.parse(e.target.result);
 
-                // Проверка дали съдържа поне една година и поне един месец
-                const isValid =
-                  typeof json === "object" &&
-                  json !== null &&
-                  Object.keys(json).length > 0 &&
-                  Object.values(json).some(
-                    (months) => typeof months === "object" && months !== null && Object.keys(months).length > 0
-                  );
+                if (json.terms && json.config) {
+                  this.terms = json.terms;
+                  this.selectedYear = json.config.selectedYear;
+                  this.selectedLanguage = json.config.selectedLanguage || "bg";
+                  this.selectedMonths = json.config.selectedMonths || [];
+                  this.rememberSelection = json.config.rememberSelection ?? true;
 
-                if (!isValid) throw new Error("Невалиден или празен календарен файл");
+                  this.saveSelectedMonths();
+                } else {
+                  // стар формат, без config
+                  this.terms = json;
+                }
 
-                this.terms = json;
-
-                // Сортиране на термините след зареждане
+                // сортиране
                 Object.keys(this.terms).forEach((year) => {
                   Object.keys(this.terms[year]).forEach((month) => {
-                    this.terms[year][month].sort((a, b) => a.day - b.day);
+                    const monthData = this.terms[year][month];
+                    if (!Array.isArray(monthData)) {
+                      // автоматично поправяне на невалидни стойности
+                      this.terms[year][month] = [];
+                    } else {
+                      this.terms[year][month].sort((a, b) => a.day - b.day);
+                    }
                   });
                 });
 
-                // Автоматично избира текущата година ако присъства
-                if (this.terms[this.selectedYear]) {
-                  this.selectedMonths = Object.keys(this.terms[this.selectedYear]).map((m) => parseInt(m));
-                  this.saveSelectedMonths();
-                }
                 localStorage.setItem("calendar_backup", JSON.stringify(json));
-
                 this.showAlert(this.translations[this.selectedLanguage].loadSuccess, "success");
               } catch (err) {
                 this.showAlert(this.translations[this.selectedLanguage].loadError, "danger");
                 console.error("Грешка при зареждане на JSON:", err);
               }
 
-              // Ресет на input полето
-              event.target.value = "";
+              event.target.value = ""; // ресет input
             };
 
             reader.readAsText(file);
@@ -664,31 +744,79 @@
             const backup = localStorage.getItem("calendar_backup");
             if (backup) {
               try {
-                this.terms = JSON.parse(backup);
+                const parsed = JSON.parse(backup);
 
-                // Сортиране
-                Object.keys(this.terms).forEach((year) => {
-                  Object.keys(this.terms[year]).forEach((month) => {
-                    this.terms[year][month].sort((a, b) => a.day - b.day);
+                if (parsed.terms && typeof parsed.terms === "object" && Object.keys(parsed.terms).length > 0) {
+                  this.terms = parsed.terms;
+                  const config = parsed.config || {};
+                  this.selectedYear = config.selectedYear || this.currentYear;
+                  this.selectedLanguage = config.selectedLanguage || "bg";
+                  this.selectedMonths = config.selectedMonths || [];
+                  this.rememberSelection = config.rememberSelection ?? true;
+
+                  Object.keys(this.terms).forEach((year) => {
+                    Object.keys(this.terms[year]).forEach((month) => {
+                      const monthData = this.terms[year][month];
+                      if (!Array.isArray(monthData)) {
+                        this.terms[year][month] = [];
+                      } else {
+                        this.terms[year][month].sort((a, b) => a.day - b.day);
+                      }
+                    });
                   });
-                });
 
-                this.showAlert(this.translations[this.selectedLanguage].restoreSuccess, "success");
+                  // Сетваме празни дни за всеки селектиран месец
+                  this.selectedMonths.forEach((index) => {
+                    if (!this.selectedDay[index]) {
+                      this.$set(this.selectedDay, index, "");
+                    }
+                  });
 
-                // Зареждане на избрани месеци (ако има за текущата година)
-                if (this.terms[this.selectedYear]) {
-                  this.selectedMonths = Object.keys(this.terms[this.selectedYear]).map((m) => parseInt(m));
                   this.saveSelectedMonths();
+                  this.showAlert(this.translations[this.selectedLanguage].restoreSuccess, "success");
+                } else {
+                  throw new Error("Архивът не съдържа валидни данни.");
                 }
               } catch (err) {
                 this.showAlert(this.translations[this.selectedLanguage].restoreError, "danger");
-                console.error("Грешка при JSON архива:", err);
+                console.error("Грешка при възстановяване на архива:", err);
               }
             } else {
               this.showAlert(this.translations[this.selectedLanguage].noBackup, "warning");
             }
           },
+          takeScreenshot() {
+            const element = document.getElementById("app");
+            const cameraButton = document.getElementById("downloadSnapshotBtn");
 
+            // 👉 Създаваме празен елемент за долен маргин
+            const paddingDiv = document.createElement("div");
+            paddingDiv.style.height = "40px";
+            paddingDiv.id = "screenshot-padding";
+            element.appendChild(paddingDiv);
+
+            // Зелен бутон за режим снимка
+            cameraButton.classList.add("screenshot-mode");
+
+            html2canvas(element, {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: "#ffffff",
+            }).then((canvas) => {
+              // Премахваме padding след снимката
+              const addedPadding = document.getElementById("screenshot-padding");
+              if (addedPadding) addedPadding.remove();
+
+              const link = document.createElement("a");
+              const now = new Date();
+              const timestamp = now.toISOString().slice(0, 19).replace(/[:T]/g, "-");
+              link.download = `calendar_snapshot_${timestamp}.png`;
+              link.href = canvas.toDataURL();
+              link.click();
+              // 👉 Връщаме бутона към нормалния му вид
+              cameraButton.classList.remove("screenshot-mode");
+            });
+          },
           showAlert(message, type = "success") {
             this.alertMessage = message;
             this.alertType = type;
@@ -701,16 +829,18 @@
         },
         watch: {
           selectedYear(newYear) {
-            // Запазваме текущите селектирани месеци (ако искаш)
-            this.saveSelectedMonths();
-
-            // Ресет на селекцията
-            this.selectedMonths = [];
-
-            // Проверяваме дали има термини за новата година
-            const yearData = this.terms[newYear];
-            if (yearData) {
-              this.selectedMonths = Object.keys(yearData).map((m) => parseInt(m));
+            // Ако има запаметена конфигурация, ползвай нея
+            const storedSelectedMonths = localStorage.getItem(`selectedMonths_${newYear}`);
+            if (storedSelectedMonths) {
+              this.selectedMonths = JSON.parse(storedSelectedMonths);
+            } else {
+              // Ако няма – опитай да вземеш от термини за съответната година
+              const yearData = this.terms[newYear];
+              if (yearData) {
+                this.selectedMonths = Object.keys(yearData).map((m) => parseInt(m));
+              } else {
+                this.selectedMonths = [];
+              }
             }
 
             // Обновява selectedDay за всеки новоселектиран месец
@@ -722,10 +852,34 @@
 
             // Запазваме новоселектираните месеци
             this.saveSelectedMonths();
+
+            // Запазваме текущия стейт в архив (за persist след рефреш)
+            const fullData = {
+              terms: this.terms,
+              config: {
+                selectedYear: this.selectedYear,
+                selectedLanguage: this.selectedLanguage,
+                selectedMonths: this.selectedMonths,
+                rememberSelection: true,
+              },
+            };
+            localStorage.setItem("calendar_backup", JSON.stringify(fullData));
           },
           terms: {
             handler() {
               this.saveToLocalStorage();
+
+              // също така обновяваме архив
+              const fullData = {
+                terms: this.terms,
+                config: {
+                  selectedYear: this.selectedYear,
+                  selectedLanguage: this.selectedLanguage,
+                  selectedMonths: this.selectedMonths,
+                  rememberSelection: true,
+                },
+              };
+              localStorage.setItem("calendar_backup", JSON.stringify(fullData));
             },
             deep: true,
           },
