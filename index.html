@@ -132,6 +132,51 @@
         border-color: #198754;
         color: white;
       }
+
+      @media (max-width: 576px) {
+        .month-container {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .month-box .month-title {
+          font-size: 16px;
+        }
+
+        .month-box .term-count {
+          font-size: 14px;
+          position: static;
+          margin-top: 5px;
+        }
+
+        .month-box {
+          height: auto;
+          padding: 10px 5px;
+        }
+
+        .term-card {
+          background: #fff;
+          border: 1px solid #ddd;
+          border-radius: 10px;
+          padding: 10px;
+          margin-bottom: 10px;
+          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .term-card .term-date {
+          font-weight: bold;
+          margin-bottom: 5px;
+        }
+
+        .term-card .term-text {
+          margin-bottom: 10px;
+        }
+
+        .term-card .term-actions {
+          display: flex;
+          gap: 5px;
+          justify-content: flex-end;
+        }
+      }
     </style>
   </head>
   <body>
@@ -219,7 +264,8 @@
               <span v-else>{{ labels.add }}</span>
             </button>
           </div>
-          <ul class="mt-2">
+
+          <ul class="mt-2" v-if="!isMobileView">
             <li
               v-for="(term, termIndex) in terms[selectedYear]?.[monthIndex] || []"
               :key="term.day + term.text.bg"
@@ -271,6 +317,50 @@
               </div>
             </li>
           </ul>
+
+          <!-- Мобилен изглед -->
+          <div v-if="isMobileView">
+            <div
+              class="term-card"
+              v-for="(term, termIndex) in terms[selectedYear]?.[monthIndex] || []"
+              :key="term.day + term.text.bg"
+            >
+              <div class="term-date">{{ term.day }} ({{ getDayOfWeek(selectedYear, monthIndex + 1, term.day) }})</div>
+              <div class="term-text">
+                <span v-if="!(editIndex === termIndex && editMonthIndex === monthIndex)">
+                  {{ term.text[selectedLanguage] }}
+                </span>
+                <input
+                  v-if="editIndex === termIndex && editMonthIndex === monthIndex"
+                  v-model="editText[selectedLanguage]"
+                  type="text"
+                  class="form-control"
+                />
+              </div>
+              <div class="term-actions">
+                <button
+                  v-if="editIndex === termIndex && editMonthIndex === monthIndex"
+                  @click="saveEdit"
+                  class="btn btn-success btn-sm"
+                >
+                  Save
+                </button>
+                <button
+                  v-if="editIndex === termIndex && editMonthIndex === monthIndex"
+                  @click="cancelEdit"
+                  class="btn btn-secondary btn-sm"
+                >
+                  Cancel
+                </button>
+                <button v-else @click="startEditing(monthIndex, termIndex)" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button @click="deleteTerm(monthIndex, termIndex)" class="btn btn-sm btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div v-if="alertMessage" :class="['alert', 'alert-' + alertType]" role="alert">{{ alertMessage }}</div>
@@ -423,6 +513,9 @@
         computed: {
           years() {
             return [this.currentYear - 1, this.currentYear, this.currentYear + 1];
+          },
+          isMobileView() {
+            return window.innerWidth <= 576;
           },
         },
         mounted() {
